@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FCFS CPU Scheduling Simulator</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen antialiased flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">OS Simulator</span>
+          <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">First-Come, First-Served (FCFS)</h1>
+        </div>
+        <p class="text-xs text-slate-500 mt-0.5">Non-preemptive CPU scheduling algorithm with horizontal timeline Gantt analysis</p>
+      </div>
+
+      <!-- Quick Preset Buttons -->
+      <div class="flex items-center gap-2">
+        <button id="presetStandard" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">Standard Workload</button>
+        <button id="presetConvoy" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition">Convoy Effect Demo</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6 flex-1 w-full">
+
+    <!-- Top Grid: Process Table & Simulation Controls -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- Left Column: Process Input Table -->
+      <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-base font-bold text-slate-900">Process Configuration</h2>
+              <p class="text-xs text-slate-500">Add or adjust Arrival Time (AT) and Burst Time (BT)</p>
+            </div>
+            <button id="addProcessBtn" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              Add Process
+            </button>
+          </div>
+
+          <div class="overflow-x-auto max-h-56 overflow-y-auto border border-slate-200 rounded-xl">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-50 text-slate-600 sticky top-0 border-b border-slate-200 font-semibold uppercase tracking-wider">
+                <tr>
+                  <th class="py-2.5 px-3">Process</th>
+                  <th class="py-2.5 px-3">Arrival Time (AT)</th>
+                  <th class="py-2.5 px-3">Burst Time (BT)</th>
+                  <th class="py-2.5 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="processTableBody" class="divide-y divide-slate-100 text-slate-700">
+                <!-- Rows injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+          <span>* FCFS allocates CPU strictly in order of arrival time</span>
+          <button id="resetDefaultsBtn" class="text-indigo-600 hover:text-indigo-800 font-medium transition">Reset Defaults</button>
+        </div>
+      </div>
+
+      <!-- Right Column: Live Stepper Controls & Core Status -->
+      <div class="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
+        <div>
+          <h2 class="text-base font-bold text-slate-900 mb-1">Execution Stepper</h2>
+          <p class="text-xs text-slate-500 mb-4">Step through time units or play continuously</p>
+
+          <!-- Clock and Active CPU Slot -->
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-center">
+              <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Simulation Clock</span>
+              <div id="clockDisplay" class="text-2xl font-black font-mono text-indigo-600 mt-0.5">t = 0</div>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-center">
+              <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">CPU Core Slot</span>
+              <div id="cpuStateDisplay" class="text-base font-bold font-mono text-slate-800 mt-1 flex items-center justify-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span> Idle
+              </div>
+            </div>
+          </div>
+
+          <!-- Stepper Buttons -->
+          <div class="flex items-center gap-2 mb-4">
+            <button id="stepBackBtn" class="flex-1 py-2 px-3 text-xs font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 transition flex items-center justify-center gap-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+              Step Back
+            </button>
+            <button id="playPauseBtn" class="flex-1 py-2 px-3 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition flex items-center justify-center gap-1">
+              <svg id="playIcon" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
+              <span id="playText">Play</span>
+            </button>
+            <button id="stepForwardBtn" class="flex-1 py-2 px-3 text-xs font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 transition flex items-center justify-center gap-1">
+              Step Forward
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+
+          <!-- Speed Slider -->
+          <div class="flex items-center justify-between gap-3 text-xs text-slate-600 mb-2">
+            <span>Speed:</span>
+            <input id="speedSlider" type="range" min="150" max="1200" step="50" value="600" class="flex-1 accent-indigo-600 cursor-pointer">
+            <span id="speedValue" class="font-mono text-slate-500 w-12 text-right">600ms</span>
+          </div>
+        </div>
+
+        <!-- Live Ready Queue Inspector -->
+        <div class="pt-3 border-t border-slate-100">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Ready Queue (FIFO)</span>
+          <div id="readyQueueContainer" class="flex items-center gap-1.5 overflow-x-auto min-h-8 p-1 bg-slate-50 border border-slate-200 rounded-lg">
+            <span class="text-xs text-slate-400 italic px-2">Queue is empty</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Convoy Effect Warning Banner (Dynamic) -->
+    <div id="convoyBanner" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-900 flex items-start gap-3">
+      <div class="p-1 rounded-md bg-amber-200 text-amber-800 mt-0.5">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+      </div>
+      <div>
+        <h4 class="text-xs font-bold uppercase tracking-wider text-amber-800">Convoy Effect Detected</h4>
+        <p class="text-xs text-amber-700 mt-0.5">A long CPU-heavy process started first at <span class="font-mono font-bold">t = 0</span>, forcing subsequent short processes to wait in the queue and significantly increasing average waiting time.</p>
+      </div>
+    </div>
+
+    <!-- Horizontal Bar Chart Gantt Timeline Section -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">Gantt Chart (Horizontal Bar Timeline)</h2>
+          <p class="text-xs text-slate-500">Y-Axis represents Processes; X-Axis represents continuous timeline ticks</p>
+        </div>
+        <div class="flex items-center gap-3 text-xs font-medium text-slate-500">
+          <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-indigo-500"></span> Execution Bar</div>
+          <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-slate-300"></span> Idle Time</div>
+          <div class="flex items-center gap-1.5"><span class="w-0.5 h-3 bg-red-500"></span> Playhead</div>
+        </div>
+      </div>
+
+      <!-- Gantt Canvas Container with Axes -->
+      <div class="overflow-x-auto border border-slate-200 rounded-xl bg-slate-50 p-4">
+        <div id="ganttContainer" class="relative select-none min-w-[700px]">
+          <!-- Gantt rows and axes generated dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Execution Metrics & Summary Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Avg Waiting Time</span>
+        <div id="avgWaitingTime" class="text-xl font-black font-mono text-slate-800 mt-1">0.00 ms</div>
+        <span class="text-[11px] text-slate-400">Time spent in ready queue</span>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Avg Turnaround</span>
+        <div id="avgTurnaroundTime" class="text-xl font-black font-mono text-slate-800 mt-1">0.00 ms</div>
+        <span class="text-[11px] text-slate-400">Total time (CT - AT)</span>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Avg Response Time</span>
+        <div id="avgResponseTime" class="text-xl font-black font-mono text-slate-800 mt-1">0.00 ms</div>
+        <span class="text-[11px] text-slate-400">Equal to WT in FCFS</span>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">CPU Utilization</span>
+        <div id="cpuUtilization" class="text-xl font-black font-mono text-indigo-600 mt-1">100.0%</div>
+        <span class="text-[11px] text-slate-400">Active vs Total duration</span>
+      </div>
+    </div>
+
+    <!-- Process Statistics Results Table -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs overflow-hidden">
+      <h2 class="text-base font-bold text-slate-900 mb-1">Per-Process Performance Report</h2>
+      <p class="text-xs text-slate-500 mb-4">Detailed completion, turnaround, and waiting statistics</p>
+
+      <div class="overflow-x-auto border border-slate-200 rounded-xl">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead class="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold uppercase tracking-wider">
+            <tr>
+              <th class="py-3 px-4">PID</th>
+              <th class="py-3 px-4">Arrival Time (AT)</th>
+              <th class="py-3 px-4">Burst Time (BT)</th>
+              <th class="py-3 px-4">Start Time</th>
+              <th class="py-3 px-4">Completion Time (CT)</th>
+              <th class="py-3 px-4">Turnaround (TAT)</th>
+              <th class="py-3 px-4">Waiting Time (WT)</th>
+            </tr>
+          </thead>
+          <tbody id="metricsTableBody" class="divide-y divide-slate-100 font-mono text-slate-700">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // Initial process datasets
+    const defaultProcesses = [
+      { id: 'P1', at: 0, bt: 4, color: '#6366f1' },
+      { id: 'P2', at: 1, bt: 3, color: '#06b6d4' },
+      { id: 'P3', at: 2, bt: 1, color: '#10b981' },
+      { id: 'P4', at: 3, bt: 2, color: '#f59e0b' }
+    ];
+
+    const convoyProcesses = [
+      { id: 'P1', at: 0, bt: 18, color: '#6366f1' },
+      { id: 'P2', at: 1, bt: 2, color: '#06b6d4' },
+      { id: 'P3', at: 2, bt: 2, color: '#10b981' },
+      { id: 'P4', at: 3, bt: 1, color: '#f59e0b' }
+    ];
+
+    const colorPalette = ['#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#f97316'];
+
+    let processes = JSON.parse(JSON.stringify(defaultProcesses));
+    let simulationSchedule = []; // computed chronological timeline slices
+    let totalDuration = 0;
+    let currentClock = 0;
+    let isPlaying = false;
+    let timerId = null;
+    let tickSpeed = 600;
+
+    // Elements
+    const processTableBody = document.getElementById('processTableBody');
+    const metricsTableBody = document.getElementById('metricsTableBody');
+    const ganttContainer = document.getElementById('ganttContainer');
+    const clockDisplay = document.getElementById('clockDisplay');
+    const cpuStateDisplay = document.getElementById('cpuStateDisplay');
+    const readyQueueContainer = document.getElementById('readyQueueContainer');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const playIcon = document.getElementById('playIcon');
+    const playText = document.getElementById('playText');
+    const stepBackBtn = document.getElementById('stepBackBtn');
+    const stepForwardBtn = document.getElementById('stepForwardBtn');
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValue = document.getElementById('speedValue');
+    const addProcessBtn = document.getElementById('addProcessBtn');
+    const resetDefaultsBtn = document.getElementById('resetDefaultsBtn');
+    const presetStandard = document.getElementById('presetStandard');
+    const presetConvoy = document.getElementById('presetConvoy');
+    const convoyBanner = document.getElementById('convoyBanner');
+
+    // Run FCFS computation
+    function computeFCFS() {
+      // Sort copy by Arrival Time, preserving input tie order
+      const sorted = [...processes].sort((a, b) => a.at - b.at);
+      simulationSchedule = [];
+      let time = 0;
+
+      const results = {};
+      processes.forEach(p => {
+        results[p.id] = { id: p.id, at: p.at, bt: p.bt, start: null, ct: null, tat: null, wt: null, color: p.color };
+      });
+
+      sorted.forEach(p => {
+        if (time < p.at) {
+          // CPU Idle period
+          simulationSchedule.push({
+            type: 'idle',
+            id: 'Idle',
+            start: time,
+            end: p.at,
+            duration: p.at - time
+          });
+          time = p.at;
+        }
+
+        const start = time;
+        const end = time + p.bt;
+        results[p.id].start = start;
+        results[p.id].ct = end;
+        results[p.id].tat = end - p.at;
+        results[p.id].wt = results[p.id].tat - p.bt;
+
+        simulationSchedule.push({
+          type: 'process',
+          id: p.id,
+          start: start,
+          end: end,
+          duration: p.bt,
+          color: p.color
+        });
+        time = end;
+      });
+
+      totalDuration = time;
+
+      // Update metrics summary cards
+      const procList = Object.values(results);
+      const totalWT = procList.reduce((sum, p) => sum + p.wt, 0);
+      const totalTAT = procList.reduce((sum, p) => sum + p.tat, 0);
+      const totalBusy = procList.reduce((sum, p) => sum + p.bt, 0);
+
+      document.getElementById('avgWaitingTime').innerText = (totalWT / procList.length || 0).toFixed(2) + ' ms';
+      document.getElementById('avgTurnaroundTime').innerText = (totalTAT / procList.length || 0).toFixed(2) + ' ms';
+      document.getElementById('avgResponseTime').innerText = (totalWT / procList.length || 0).toFixed(2) + ' ms';
+      document.getElementById('cpuUtilization').innerText = totalDuration > 0 ? ((totalBusy / totalDuration) * 100).toFixed(1) + '%' : '100.0%';
+
+      // Check Convoy Effect
+      if (processes.length >= 3) {
+        const first = sorted[0];
+        const rest = sorted.slice(1);
+        const avgRestBT = rest.reduce((s, p) => s + p.bt, 0) / rest.length;
+        if (first.at === 0 && first.bt >= 12 && first.bt >= avgRestBT * 3) {
+          convoyBanner.classList.remove('hidden');
+        } else {
+          convoyBanner.classList.add('hidden');
+        }
+      } else {
+        convoyBanner.classList.add('hidden');
+      }
+
+      renderMetricsTable(results);
+      renderHorizontalGantt();
+      updateSimulationUI();
+    }
+
+    // Render Process Table
+    function renderProcessTable() {
+      processTableBody.innerHTML = '';
+      processes.forEach((p, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition';
+        tr.innerHTML = `
+          <td class="py-2 px-3 font-semibold flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${p.color}"></span>
+            ${p.id}
+          </td>
+          <td class="py-2 px-3">
+            <input type="number" min="0" max="99" value="${p.at}" data-id="${p.id}" class="at-input w-20 px-2 py-1 rounded border border-slate-200 text-xs font-mono focus:border-indigo-500 focus:outline-none">
+          </td>
+          <td class="py-2 px-3">
+            <input type="number" min="1" max="99" value="${p.bt}" data-id="${p.id}" class="bt-input w-20 px-2 py-1 rounded border border-slate-200 text-xs font-mono focus:border-indigo-500 focus:outline-none">
+          </td>
+          <td class="py-2 px-3 text-right">
+            ${processes.length > 1 ? `
+              <button data-id="${p.id}" class="delete-btn text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            ` : '<span class="text-slate-300 text-xs">—</span>'}
+          </td>
+        `;
+        processTableBody.appendChild(tr);
+      });
+
+      // Bind events
+      document.querySelectorAll('.at-input').forEach(input => {
+        input.addEventListener('change', e => {
+          const val = Math.max(0, parseInt(e.target.value) || 0);
+          const p = processes.find(x => x.id === e.target.dataset.id);
+          if (p) p.at = val;
+          computeFCFS();
+        });
+      });
+
+      document.querySelectorAll('.bt-input').forEach(input => {
+        input.addEventListener('change', e => {
+          const val = Math.max(1, parseInt(e.target.value) || 1);
+          const p = processes.find(x => x.id === e.target.dataset.id);
+          if (p) p.bt = val;
+          computeFCFS();
+        });
+      });
+
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+          const id = btn.dataset.id;
+          processes = processes.filter(p => p.id !== id);
+          renderProcessTable();
+          computeFCFS();
+        });
+      });
+    }
+
+    // Render Results Table
+    function renderMetricsTable(results) {
+      metricsTableBody.innerHTML = '';
+      processes.forEach(p => {
+        const res = results[p.id];
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition';
+        tr.innerHTML = `
+          <td class="py-2.5 px-4 font-bold text-slate-800 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full" style="background-color: ${p.color}"></span>
+            ${p.id}
+          </td>
+          <td class="py-2.5 px-4">${p.at}</td>
+          <td class="py-2.5 px-4">${p.bt}</td>
+          <td class="py-2.5 px-4 text-slate-600">${res.start !== null ? res.start : '—'}</td>
+          <td class="py-2.5 px-4 font-semibold text-slate-900">${res.ct !== null ? res.ct : '—'}</td>
+          <td class="py-2.5 px-4 text-indigo-600 font-semibold">${res.tat !== null ? res.tat : '—'}</td>
+          <td class="py-2.5 px-4 text-emerald-600 font-semibold">${res.wt !== null ? res.wt : '—'}</td>
+        `;
+        metricsTableBody.appendChild(tr);
+      });
+    }
+
+    // Render Horizontal Bar Chart Gantt
+    function renderHorizontalGantt() {
+      ganttContainer.innerHTML = '';
+      if (totalDuration === 0) return;
+
+      const unitWidth = 28; // width in pixels per timeline unit
+      const totalWidth = totalDuration * unitWidth;
+      const labelColWidth = 90; // width of categorical Y-axis label
+
+      // Outer wrapper
+      const wrapper = document.createElement('div');
+      wrapper.className = 'flex flex-col';
+
+      // Rows for each process
+      processes.forEach(p => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center h-10 border-b border-slate-200/60 relative';
+
+        // Y-axis label
+        const yLabel = document.createElement('div');
+        yLabel.className = 'w-[90px] shrink-0 font-bold text-xs flex items-center gap-2 px-2 text-slate-700 bg-white z-10';
+        yLabel.innerHTML = `<span class="w-2.5 h-2.5 rounded-full" style="background-color: ${p.color}"></span> ${p.id}`;
+        row.appendChild(yLabel);
+
+        // Chart track
+        const track = document.createElement('div');
+        track.className = 'relative flex-1 h-full flex items-center bg-white/40';
+        track.style.width = `${totalWidth}px`;
+
+        // Render process execution block if present in schedule
+        const blockData = simulationSchedule.find(s => s.type === 'process' && s.id === p.id);
+        if (blockData) {
+          const bar = document.createElement('div');
+          bar.className = 'absolute h-6 rounded-md shadow-2xs flex items-center justify-between px-2 text-[11px] font-mono font-bold text-white transition-all cursor-pointer';
+          bar.style.left = `${blockData.start * unitWidth}px`;
+          bar.style.width = `${blockData.duration * unitWidth}px`;
+          bar.style.backgroundColor = p.color;
+          bar.title = `${p.id}: Start = ${blockData.start}, Completion = ${blockData.end}`;
+          bar.innerHTML = `<span>${p.id}</span><span class="text-[10px] opacity-90">${blockData.duration}u</span>`;
+          bar.addEventListener('click', () => { currentClock = blockData.start; updateSimulationUI(); });
+          track.appendChild(bar);
+        }
+
+        row.appendChild(track);
+        wrapper.appendChild(row);
+      });
+
+      // CPU Idle row (if idle periods exist)
+      const hasIdle = simulationSchedule.some(s => s.type === 'idle');
+      if (hasIdle) {
+        const idleRow = document.createElement('div');
+        idleRow.className = 'flex items-center h-8 border-b border-slate-200/60 relative bg-slate-50/50';
+
+        const yLabel = document.createElement('div');
+        yLabel.className = 'w-[90px] shrink-0 font-medium text-xs flex items-center gap-2 px-2 text-slate-400 bg-slate-50 z-10';
+        yLabel.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-300"></span> Idle`;
+        idleRow.appendChild(yLabel);
+
+        const track = document.createElement('div');
+        track.className = 'relative flex-1 h-full flex items-center';
+        track.style.width = `${totalWidth}px`;
+
+        simulationSchedule.filter(s => s.type === 'idle').forEach(idle => {
+          const bar = document.createElement('div');
+          bar.className = 'absolute h-4 rounded bg-slate-200/80 border border-slate-300 text-slate-500 flex items-center justify-center text-[10px] font-mono cursor-pointer';
+          bar.style.left = `${idle.start * unitWidth}px`;
+          bar.style.width = `${idle.duration * unitWidth}px`;
+          bar.title = `CPU Idle from t = ${idle.start} to ${idle.end}`;
+          bar.innerText = 'idle';
+          bar.addEventListener('click', () => { currentClock = idle.start; updateSimulationUI(); });
+          track.appendChild(bar);
+        });
+
+        idleRow.appendChild(track);
+        wrapper.appendChild(idleRow);
+      }
+
+      // X-Axis (Timeline ticks and markers)
+      const xAxisRow = document.createElement('div');
+      xAxisRow.className = 'flex items-start h-8 pt-1.5 relative border-t border-slate-300';
+
+      const xOrigin = document.createElement('div');
+      xOrigin.className = 'w-[90px] shrink-0 text-right pr-3 text-[11px] font-bold text-slate-400';
+      xOrigin.innerText = 'Time (t)';
+      xAxisRow.appendChild(xOrigin);
+
+      const xTrack = document.createElement('div');
+      xTrack.className = 'relative flex-1 h-full';
+      xTrack.style.width = `${totalWidth}px`;
+
+      for (let t = 0; t <= totalDuration; t++) {
+        const tick = document.createElement('div');
+        tick.className = 'absolute flex flex-col items-center -translate-x-1/2';
+        tick.style.left = `${t * unitWidth}px`;
+
+        const isMajor = t % 5 === 0 || t === totalDuration;
+        tick.innerHTML = `
+          <span class="w-px ${isMajor ? 'h-2.5 bg-slate-400' : 'h-1.5 bg-slate-300'}"></span>
+          <span class="text-[10px] font-mono ${isMajor ? 'font-bold text-slate-700' : 'text-slate-400'} mt-0.5">${t}</span>
+        `;
+        xTrack.appendChild(tick);
+      }
+      xAxisRow.appendChild(xTrack);
+      wrapper.appendChild(xAxisRow);
+
+      // Vertical Playhead Line
+      const playhead = document.createElement('div');
+      playhead.id = 'playheadLine';
+      playhead.className = 'absolute top-0 bottom-8 w-0.5 bg-rose-500 z-20 pointer-events-none transition-all duration-150';
+      playhead.style.left = `${labelColWidth + currentClock * unitWidth}px`;
+
+      const playheadKnob = document.createElement('div');
+      playheadKnob.className = 'absolute -top-1.5 -left-1.5 w-3.5 h-3.5 rounded-full bg-rose-500 border-2 border-white shadow-xs';
+      playhead.appendChild(playheadKnob);
+
+      ganttContainer.appendChild(wrapper);
+      ganttContainer.appendChild(playhead);
+
+      // Click to scrub along time
+      ganttContainer.onclick = (e) => {
+        const rect = ganttContainer.getBoundingClientRect();
+        const clickX = e.clientX - rect.left - labelColWidth;
+        if (clickX >= 0) {
+          const clickedTick = Math.min(totalDuration, Math.max(0, Math.round(clickX / unitWidth)));
+          currentClock = clickedTick;
+          updateSimulationUI();
+        }
+      };
+    }
+
+    // Update Live Simulation Clock & Queue State
+    function updateSimulationUI() {
+      clockDisplay.innerText = `t = ${currentClock}`;
+
+      // Update vertical playhead position
+      const playhead = document.getElementById('playheadLine');
+      const unitWidth = 28;
+      const labelColWidth = 90;
+      if (playhead) {
+        playhead.style.left = `${labelColWidth + currentClock * unitWidth}px`;
+      }
+
+      // Find currently executing process
+      const currentBlock = simulationSchedule.find(s => currentClock >= s.start && currentClock < s.end);
+
+      if (currentBlock && currentBlock.type === 'process') {
+        const p = processes.find(x => x.id === currentBlock.id);
+        cpuStateDisplay.innerHTML = `
+          <span class="w-2.5 h-2.5 rounded-full animate-pulse" style="background-color: ${p.color}"></span>
+          <span>${p.id}</span>
+          <span class="text-xs text-slate-400 font-normal">(${currentClock - currentBlock.start + 1}/${currentBlock.duration}u)</span>
+        `;
+      } else {
+        cpuStateDisplay.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span> Idle`;
+      }
+
+      // Ready Queue: processes that have arrived (at <= currentClock) and not yet finished
+      const waitingInQueue = processes.filter(p => {
+        const block = simulationSchedule.find(s => s.type === 'process' && s.id === p.id);
+        const hasArrived = p.at <= currentClock;
+        const isNotFinished = block ? block.end > currentClock : false;
+        const isCurrentlyRunning = currentBlock && currentBlock.id === p.id;
+        return hasArrived && isNotFinished && !isCurrentlyRunning;
+      }).sort((a, b) => a.at - b.at);
+
+      readyQueueContainer.innerHTML = '';
+      if (waitingInQueue.length === 0) {
+        readyQueueContainer.innerHTML = '<span class="text-xs text-slate-400 italic px-2">Queue is empty</span>';
+      } else {
+        waitingInQueue.forEach((p, idx) => {
+          const badge = document.createElement('div');
+          badge.className = 'px-2.5 py-1 rounded-md text-xs font-mono font-bold text-white shadow-2xs flex items-center gap-1.5 shrink-0';
+          badge.style.backgroundColor = p.color;
+          badge.innerHTML = `<span>#${idx + 1}</span> <span>${p.id}</span>`;
+          readyQueueContainer.appendChild(badge);
+        });
+      }
+    }
+
+    // Playback loop
+    function stepForward() {
+      if (currentClock < totalDuration) {
+        currentClock++;
+        updateSimulationUI();
+      } else {
+        pauseSimulation();
+      }
+    }
+
+    function stepBackward() {
+      if (currentClock > 0) {
+        currentClock--;
+        updateSimulationUI();
+      }
+    }
+
+    function playSimulation() {
+      if (currentClock >= totalDuration) currentClock = 0;
+      isPlaying = true;
+      playText.innerText = 'Pause';
+      playIcon.innerHTML = '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>';
+      timerId = setInterval(stepForward, tickSpeed);
+    }
+
+    function pauseSimulation() {
+      isPlaying = false;
+      playText.innerText = 'Play';
+      playIcon.innerHTML = '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>';
+      clearInterval(timerId);
+    }
+
+    playPauseBtn.onclick = () => isPlaying ? pauseSimulation() : playSimulation();
+    stepForwardBtn.onclick = () => { pauseSimulation(); stepForward(); };
+    stepBackBtn.onclick = () => { pauseSimulation(); stepBackward(); };
+
+    speedSlider.oninput = (e) => {
+      tickSpeed = parseInt(e.target.value);
+      speedValue.innerText = `${tickSpeed}ms`;
+      if (isPlaying) {
+        clearInterval(timerId);
+        timerId = setInterval(stepForward, tickSpeed);
+      }
+    };
+
+    // Add Process
+    addProcessBtn.onclick = () => {
+      if (processes.length >= 8) return alert('Maximum 8 processes for visualization layout.');
+      const nextId = 'P' + (processes.length + 1);
+      const last = processes[processes.length - 1];
+      processes.push({
+        id: nextId,
+        at: last ? last.at + 1 : 0,
+        bt: Math.floor(Math.random() * 5) + 2,
+        color: colorPalette[processes.length % colorPalette.length]
+      });
+      renderProcessTable();
+      computeFCFS();
+    };
+
+    resetDefaultsBtn.onclick = () => {
+      processes = JSON.parse(JSON.stringify(defaultProcesses));
+      currentClock = 0;
+      pauseSimulation();
+      renderProcessTable();
+      computeFCFS();
+    };
+
+    presetStandard.onclick = resetDefaultsBtn.onclick;
+
+    presetConvoy.onclick = () => {
+      processes = JSON.parse(JSON.stringify(convoyProcesses));
+      currentClock = 0;
+      pauseSimulation();
+      renderProcessTable();
+      computeFCFS();
+    };
+
+    // Initial load
+    renderProcessTable();
+    computeFCFS();
+  </script>
+</body>
+</html>
